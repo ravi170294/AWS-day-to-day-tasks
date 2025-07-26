@@ -1,26 +1,34 @@
 #!/bin/bash
 
-# List of volume IDs passed as arguments
-volume_ids=("$@")
+# Ask user to enter comma-separated Volume IDs
+read -p "Enter EBS Volume IDs (comma-separated): " volume_input
 
-# Check if volume IDs were provided
-if [ ${#volume_ids[@]} -eq 0 ]; then
-  echo "Usage: $0 <volume-id-1> <volume-id-2> ... <volume-id-N>"
-  exit 1
-fi
+# Convert input into an array
+IFS=',' read -ra volume_ids <<< "$volume_input"
 
-# Loop through each volume ID
+echo "Checking and deleting EBS volumes..."
+
 for volume_id in "${volume_ids[@]}"; do
-  echo "Checking volume: $volume_id"
+    volume_id=$(echo "$volume_id" | xargs)  # Trim whitespace
+    echo "Processing Volume ID: $volume_id"
 
-  # Get the volume state using AWS CLI
-  state=$(aws ec2 describe-volumes --volume-ids "$volume_id" \
-    --query "Volumes[0].State" --output text)
+    # Get the volume state
+    state=$(aws ec2 describe-volumes --volume-ids "$volume_id" \
+        --query "Volumes[0].State" --output text 2>/dev/null)
 
-  if [ "$state" == "available" ]; then
-    echo "Deleting volume: $volume_id (State: available)"
-    aws ec2 delete-volume --volume-id "$volume_id"
-  else
-    echo "Skipping volume: $volume_id (State: $state)"
-  fi
+    if [[ "$state" == "available" ]]; then
+        echo "Volume $volume_id is in 'available' state. Deleting..."
+        aws ec2 delete-volume --volume-id "$volume_id"
+        echo "Deleted volume $volume_id."
+    elif [[ "$state" == "in-use" ]]; then
+        echo "⚠️ Volume $volume_id is 'in-use'. Skipping deletion."
+    elif [[ -z "$state" ]]; then
+        echo "❌ Volume $volume_id not found or invalid ID."
+    else
+        echo "⚠️ Volume $volume_id is in '$state' state. Skipping."
+    fi
+
+    echo "--------------------------------------"
 done
+
+echo "✅ Script complete."
