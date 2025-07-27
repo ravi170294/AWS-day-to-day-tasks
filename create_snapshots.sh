@@ -31,13 +31,18 @@ for instance_id in "${instances[@]}"; do
             --query SnapshotId \
             --output text)
 
-        # Tag the snapshot
-        aws ec2 create-tags \
-            --resources "$snapshot_id" \
-            --region "$region" \
-            --tags Key=Name,Value="${instance_id}-${volume_id}" \
-                   Key=CreatedBy,Value=SnapshotScript \
-                   Key=InstanceId,Value="$instance_id"
+        # Get current date in YYYY-MM-DD format
+			current_date=$(date +%F)
+
+			# Tag the snapshot
+			aws ec2 create-tags \
+				--resources "$snapshot_id" \
+				--region "$region" \
+				--tags Key=Name,Value="${instance_id}-${volume_id}" \
+					   Key=CreatedBy,Value=SnapshotScript \
+					   Key=InstanceId,Value="$instance_id" \
+					   Key=Date,Value="$current_date"
+
 
         echo "✅ Snapshot created: $snapshot_id"
     done
